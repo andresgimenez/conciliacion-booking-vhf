@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliación Booking.com — Hotel Ariston</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #171b26;
+    --surface2: #1e2335;
+    --border: #2a2f45;
+    --accent: #4f8ef7;
+    --accent2: #7c5cfc;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --muted: #6b7280;
+    --text: #e8eaf0;
+    --text2: #9aa0b4;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    gap: 16px;
+  }
+
+  .logo-area h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+
+  .logo-area h1 span {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo-area p {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 6px;
+    font-family: var(--mono);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text2);
+    white-space: nowrap;
+  }
+
+  .badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Upload zone */
+  .upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .upload-card {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .upload-card.booking::before { background: radial-gradient(ellipse at 50% 0%, rgba(79,142,247,0.08) 0%, transparent 70%); }
+  .upload-card.vhf::before { background: radial-gradient(ellipse at 50% 0%, rgba(124,92,252,0.08) 0%, transparent 70%); }
+
+  .upload-card:hover { border-color: var(--accent); }
+  .upload-card:hover::before { opacity: 1; }
+  .upload-card.loaded { border-style: solid; border-color: var(--success); }
+  .upload-card.loaded::before { opacity: 1; background: radial-gradient(ellipse at 50% 0%, rgba(34,197,94,0.06) 0%, transparent 70%); }
+
+  .upload-card input { display: none; }
+
+  .upload-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+
+  .booking .upload-icon { background: rgba(79,142,247,0.12); }
+  .vhf .upload-icon { background: rgba(124,92,252,0.12); }
+  .loaded .upload-icon { background: rgba(34,197,94,0.12); }
+
+  .upload-card h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+
+  .upload-card p {
+    font-size: 12px;
+    color: var(--text2);
+    font-family: var(--mono);
+  }
+
+  .file-status {
+    margin-top: 12px;
+    font-size: 11px;
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .file-status.ok { color: var(--success); }
+  .file-status.empty { color: var(--muted); }
+
+  /* Run button */
+  .run-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 40px;
+    letter-spacing: 0.3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .run-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .run-btn:hover::after { opacity: 1; }
+  .run-btn:active { transform: scale(0.99); }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .stat-card.total::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .stat-card.ok::before { background: var(--success); }
+  .stat-card.action::before { background: var(--danger); }
+  .stat-card.unknown::before { background: var(--warn); }
+
+  .stat-num {
+    font-size: 32px;
+    font-weight: 800;
+    font-family: var(--mono);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-card.ok .stat-num { color: var(--success); }
+  .stat-card.action .stat-num { color: var(--danger); }
+  .stat-card.unknown .stat-num { color: var(--warn); }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: var(--mono);
+  }
+
+  /* Results sections */
+  .section {
+    margin-bottom: 32px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  .section-count {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text2);
+  }
+
+  .section-header.danger .section-title { color: var(--danger); }
+  .section-header.danger .section-count { border-color: var(--danger); color: var(--danger); }
+  .section-header.warn .section-title { color: var(--warn); }
+  .section-header.warn .section-count { border-color: var(--warn); color: var(--warn); }
+  .section-header.success .section-title { color: var(--success); }
+  .section-header.success .section-count { border-color: var(--success); color: var(--success); }
+
+  .indicator {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .indicator.danger { background: var(--danger); }
+  .indicator.warn { background: var(--warn); }
+  .indicator.success { background: var(--success); }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    background: var(--surface2);
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 10px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text2);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+
+  tbody td {
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .pill-danger { background: rgba(239,68,68,0.12); color: var(--danger); }
+  .pill-warn { background: rgba(245,158,11,0.12); color: var(--warn); }
+  .pill-success { background: rgba(34,197,94,0.12); color: var(--success); }
+
+  .booking-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  .score-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .score-bg {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .score-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+
+  /* Export button */
+  .export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 18px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 20px;
+  }
+
+  .export-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--muted);
+  }
+
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 13px; font-family: var(--mono); }
+
+  /* Matched name display */
+  .name-match {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .name-booking { color: var(--text); }
+  .name-vhf { color: var(--text2); font-size: 10px; }
+
+  /* Hidden results */
+  #results { display: none; }
+
+  @media (max-width: 700px) {
+    .upload-grid { grid-template-columns: 1fr; }
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-area">
+      <h1>Conciliación<br><span>Booking.com</span></h1>
+      <p>Hotel Ariston · VHF / CM de Totvs</p>
+    </div>
+    <div class="badge">
+      <span class="dot"></span>
+      Listo para procesar
+    </div>
+  </header>
+
+  <!-- Upload zone -->
+  <div class="upload-grid">
+    <label class="upload-card booking" id="card-booking">
+      <input type="file" id="file-booking" accept=".xls,.xlsx">
+      <div class="upload-icon">📋</div>
+      <h3>Listado Booking.com</h3>
+      <p>Exportación de check-outs (.xls / .xlsx)</p>
+      <div class="file-status empty" id="status-booking">— Sin archivo</div>
+    </label>
+
+    <label class="upload-card vhf" id="card-vhf">
+      <input type="file" id="file-vhf" accept=".xls,.xlsx">
+      <div class="upload-icon">🏨</div>
+      <h3>Listado VHF / Totvs</h3>
+      <p>Reservas del período (.xls / .xlsx)</p>
+      <div class="file-status empty" id="status-vhf">— Sin archivo</div>
+    </label>
+  </div>
+
+  <button class="run-btn" id="run-btn" disabled onclick="runReconciliation()">
+    ▶ Procesar conciliación
+  </button>
+
+  <!-- Results -->
+  <div id="results">
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-card total">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-label">Reservas Booking</div>
+      </div>
+      <div class="stat-card ok">
+        <div class="stat-num" id="stat-ok">0</div>
+        <div class="stat-label">Check-out OK</div>
+      </div>
+      <div class="stat-card action">
+        <div class="stat-num" id="stat-action">0</div>
+        <div class="stat-label">Dar de baja</div>
+      </div>
+      <div class="stat-card unknown">
+        <div class="stat-num" id="stat-unknown">0</div>
+        <div class="stat-label">Revisión manual</div>
+      </div>
+    </div>
+
+    <!-- Section: Require action -->
+    <div class="section" id="section-action">
+      <div class="section-header danger">
+        <div class="indicator danger"></div>
+        <span class="section-title">⚠ Requieren baja en Booking.com</span>
+        <span class="section-count" id="count-action">0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>N° Booking</th>
+              <th>Huésped (Booking)</th>
+              <th>Coincidencia en VHF</th>
+              <th>Check-in</th>
+              <th>Check-out</th>
+              <th>Estado VHF</th>
+              <th>Similitud</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-action"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: Not found -->
+    <div class="section" id="section-unknown">
+      <div class="section-header warn">
+        <div class="indicator warn"></div>
+        <span class="section-title">? Revisión manual</span>
+        <span class="section-count" id="count-unknown">0</span>
+      </div>
+      <label style="display:block;padding:12px"><input id="pending-only" type="checkbox" onchange="showPending()"> Mostrar solo pendientes</label>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Revisada</th><th>N° Booking</th>
+              <th>Huésped (Booking)</th>
+              <th>Check-in</th>
+              <th>Check-out</th>
+              <th>Mejor coincidencia VHF</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-unknown"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: OK -->
+    <div class="section" id="section-ok">
+      <div class="section-header success">
+        <div class="indicator success"></div>
+        <span class="section-title">✓ Check-out confirmado</span>
+        <span class="section-count" id="count-ok">0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>N° Booking</th>
+              <th>Huésped (Booking)</th>
+              <th>Coincidencia en VHF</th>
+              <th>Check-in</th>
+              <th>Check-out</th>
+              <th>Similitud</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-ok"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <button class="export-btn" onclick="exportResults()">
+      ⬇ Exportar resultados a Excel
+    </button>
+  </div>
+
+</div>
+
+<script>
+let bookingData = null;
+let vhfData = null;
+let lastResults = null;
+
+// ── File loading ──────────────────────────────────────────────────────────────
+
+document.getElementById('file-booking').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  readExcel(file, (data) => {
+    bookingData = parseBooking(data);
+    document.getElementById('status-booking').textContent = `✓ ${file.name} — ${bookingData.length} reservas`;
+    document.getElementById('status-booking').className = 'file-status ok';
+    document.getElementById('card-booking').classList.add('loaded');
+    checkReady();
+  });
+});
+
+document.getElementById('file-vhf').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  readExcel(file, (data) => {
+    vhfData = parseVHF(data);
+    document.getElementById('status-vhf').textContent = `✓ ${file.name} — ${vhfData.length} entradas`;
+    document.getElementById('status-vhf').className = 'file-status ok';
+    document.getElementById('card-vhf').classList.add('loaded');
+    checkReady();
+  });
+});
+
+function checkReady() {
+  document.getElementById('run-btn').disabled = !(bookingData && vhfData);
+}
+
+function readExcel(file, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'dd/mm/yyyy' });
+    callback(json);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Parsers ───────────────────────────────────────────────────────────────────
+
+function parseBooking(rows) {
+  // Row 0 is header
+  const header = rows[0];
+  const idx = {
+    bookNum: header.indexOf('Book number'),
+    guest: header.indexOf('Guest name(s)'),
+    checkin: header.indexOf('Check-in'),
+    checkout: header.indexOf('Check-out'),
+    status: header.indexOf('Status'),
+    unitType: header.indexOf('Unit type'),
+  };
+
+  return rows.slice(1).filter(r => r[idx.bookNum]).map(r => ({
+    bookNum: String(r[idx.bookNum] || '').trim(),
+    booker: String(r[header.indexOf('Booked by')] || ''),
+    rooms: Number(r[header.indexOf('Rooms')]),
+    guest: String(r[idx.guest] || '').trim(),
+    checkin: String(r[idx.checkin] || '').trim(),
+    checkout: String(r[idx.checkout] || '').trim(),
+    status: String(r[idx.status] || '').trim(),
+    unitType: String(r[idx.unitType] || '').trim(),
+  }));
+}
+
+function parseVHF(rows) {
+  // Find header row (contains 'Nombre Huésped')
+  let headerIdx = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].some(c => typeof c === 'string' && c.includes('Nombre'))) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) return [];
+
+  const results = [];
+
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0] || typeof r[0] !== 'string') continue;
+    // Col 9 = Reservante (status)
+    const reservante = String(r[9] || '').trim().toUpperCase();
+    if (!reservante || !/^\d{2}\/\d{2}\/\d{4}$/.test(String(r[6]))) continue;
+
+    results.push({
+      nombre: String(r[0] || '').trim(),
+      hab: String(r[3] || '').trim(),
+      llegada: String(r[5] || '').trim(),
+      partida: String(r[6] || '').trim(),
+      reservaNum: String(r[8] || '').trim(),
+      status: reservante,
+    });
+  }
+  return results;
+}
+
+// ── Name normalization & matching ─────────────────────────────────────────────
+
+function normalizeName(name) {
+  return name
+    .toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenize(name) {
+  return normalizeName(name).split(' ').filter(t => t.length > 1);
+}
+
+function dateKey(value) {
+  return value.replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, '$3-$2-$1');
+}
+
+function words(name) {
+  return [...new Set(tokenize(name).filter(w => !['DE','DEL','LA','LOS','LAS','DA','DO','DOS'].includes(w)))];
+}
+
+function oneEdit(a,b) {
+  if (a.length > b.length) return oneEdit(b,a);
+  if (b.length-a.length > 1) return false;
+  let i=0;
+  while (i<a.length && a[i]===b[i]) i++;
+  return a.slice(i+(a.length===b.length ? 1 : 0)) === b.slice(i+1);
+}
+
+function nameScore(a, b) {
+  const shared = a.filter(w => b.includes(w)).length;
+  if (!shared) return 0;
+  if (shared === 1) {
+    const near = a.some(x => !b.includes(x) && b.some(y =>
+      !a.includes(y) && Math.min(x.length,y.length) >= 4 && oneEdit(x,y)));
+    return near ? 0.74 : 0.3;
+  }
+  return (shared / Math.min(a.length,b.length) + shared / Math.max(a.length,b.length)) / 2;
+}
+
+function findStay(booking, stays) {
+  const aliases = [booking.guest, ...booking.guest.split(/[,;/&]/), booking.booker].map(words);
+  const arrival = dateKey(booking.checkin);
+  const departure = dateKey(booking.checkout);
+  const candidates = new Map();
+  for (const stay of stays) {
+    const sameIn = arrival === dateKey(stay.llegada);
+    const sameOut = departure === dateKey(stay.partida);
+    if (!sameIn && !sameOut) continue;
+    const score = Math.max(...aliases.map(a => nameScore(a,stay.words)));
+    if (!score) continue;
+    const key = JSON.stringify([stay.reservaNum,stay.hab,stay.llegada,stay.partida,stay.status]);
+    const rank = score + (sameIn && sameOut ? 0.35 : 0);
+    if (!candidates.has(key) || candidates.get(key).rank < rank)
+      candidates.set(key,{vhf:stay,score,rank,key,exactDates:sameIn && sameOut});
+  }
+  const [best,next] = [...candidates.values()].sort((a,b) => b.rank-a.rank);
+  let reason = '';
+  if (!best) reason = 'Sin candidato por nombre y fechas';
+  else if (booking.rooms !== 1) reason = 'Comprobar todas las habitaciones';
+  else if (!best.exactDates) reason = 'Solo coincide una fecha';
+  else if (best.score < 0.70) reason = 'Nombre incompleto o distinto';
+  else if (next && best.rank-next.rank < 0.08) reason = 'Varios candidatos similares';
+  else if (!['CHECKOUT','CANCELADA','NO SHOW'].includes(best.vhf.status)) reason = 'Estado VHF pendiente';
+  else if (booking.status.toLowerCase() !== 'ok') reason = 'Verificar estado en Booking';
+  return {booking,...best,reason};
+}
+
+function reviewKey(r) {
+  return JSON.stringify(['ariston-review-v1',r.booking.bookNum,r.booking.checkout,r.reason,r.key]);
+}
+const reviewedNow = new Set();
+function isReviewed(r) {
+  const key = reviewKey(r);
+  try { return localStorage.getItem(key) === '1'; } catch { return reviewedNow.has(key); }
+}
+function updateReview(index, checked) {
+  const key = reviewKey(lastResults.unknownRows[index]);
+  if (checked) reviewedNow.add(key); else reviewedNow.delete(key);
+  try { if (checked) localStorage.setItem(key,'1'); else localStorage.removeItem(key); } catch {}
+  showPending();
+}
+function showPending() {
+  const rows = lastResults.unknownRows;
+  document.getElementById('count-unknown').textContent = rows.filter(r => !isReviewed(r)).length + ' pendientes de ' + rows.length;
+  document.querySelectorAll('#tbody-unknown tr[data-index]').forEach(row => {
+    row.hidden = document.getElementById('pending-only').checked && isReviewed(rows[row.dataset.index]);
+  });
+}
+function runReconciliation() {
+  const stays = vhfData.map(v => ({...v,words:words(v.nombre)}));
+  const matches = bookingData.map(b => findStay(b,stays));
+  const claims = new Map();
+  for (const r of matches) {
+    if (r.exactDates && r.score >= 0.70) claims.set(r.key,(claims.get(r.key)||0)+1);
+  }
+  const actionRows=[], unknownRows=[], okRows=[];
+  for (const r of matches) {
+    if (!r.reason && claims.get(r.key)>1) r.reason='Misma estadía sugerida para varias reservas';
+    if (r.reason) unknownRows.push(r);
+    else if (r.vhf.status==='CHECKOUT') okRows.push(r);
+    else actionRows.push(r);
+  }
+  lastResults={actionRows,unknownRows,okRows};
+  renderResults(actionRows,unknownRows,okRows);
+  showPending();
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+
+function escapeText(value) {
+  return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+}
+function scoreBar(score) {
+  const pct = Math.round(score * 100);
+  const color = score >= 0.7 ? '#22c55e' : score >= 0.45 ? '#f59e0b' : '#ef4444';
+  return `
+    <div class="score-bar">
+      <div class="score-bg"><div class="score-fill" style="width:${pct}%;background:${color}"></div></div>
+      <span style="font-size:10px;color:var(--text2)">${pct}%</span>
+    </div>`;
+}
+
+function renderResults(action, unknown, ok) {
+  document.getElementById('results').style.display = 'block';
+
+  document.getElementById('stat-total').textContent = bookingData.length;
+  document.getElementById('stat-ok').textContent = ok.length;
+  document.getElementById('stat-action').textContent = action.length;
+  document.getElementById('stat-unknown').textContent = unknown.length;
+
+  document.getElementById('count-action').textContent = action.length;
+  document.getElementById('count-unknown').textContent = unknown.length;
+  document.getElementById('count-ok').textContent = ok.length;
+
+  // Action table
+  const tbAction = document.getElementById('tbody-action');
+  tbAction.innerHTML = action.length === 0
+    ? `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-family:var(--mono)">Sin reservas que requieran acción ✓</td></tr>`
+    : action.map(r => `
+      <tr>
+        <td><span class="booking-num">${escapeText(r.booking.bookNum)}</span></td>
+        <td>${escapeText(r.booking.guest)}</td>
+        <td><div class="name-match"><span class="name-booking">${escapeText(r.vhf.nombre)}</span></div></td>
+        <td>${escapeText(r.booking.checkin)}</td>
+        <td>${escapeText(r.booking.checkout)}</td>
+        <td><span class="status-pill pill-danger">${escapeText(r.vhf.status)}</span></td>
+        <td>${scoreBar(r.score)}</td>
+      </tr>`).join('');
+
+  // Unknown table
+  const tbUnknown = document.getElementById('tbody-unknown');
+  tbUnknown.innerHTML = unknown.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);font-family:var(--mono)">Todas las reservas fueron encontradas ✓</td></tr>`
+    : unknown.map((r,i) => `
+      <tr data-index="${i}"><td><input type="checkbox" aria-label="Revisada ${escapeText(r.booking.bookNum)}" ${isReviewed(r) ? "checked" : ""} onchange="updateReview(${i},this.checked)"></td>
+        <td><span class="booking-num">${escapeText(r.booking.bookNum)}</span></td>
+        <td>${escapeText(r.booking.guest)}</td>
+        <td>${escapeText(r.booking.checkin)}</td>
+        <td>${escapeText(r.booking.checkout)}</td>
+        <td style="color:var(--muted)">${r.vhf ? escapeText(r.vhf.nombre + ' · ' + r.vhf.status + ' · ' + r.vhf.llegada + ' – ' + r.vhf.partida) : '—'}</td>
+        <td>${r.reason}</td>
+      </tr>`).join('');
+
+  // OK table
+  const tbOk = document.getElementById('tbody-ok');
+  tbOk.innerHTML = ok.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted);font-family:var(--mono)">Sin check-outs confirmados</td></tr>`
+    : ok.map(r => `
+      <tr>
+        <td><span class="booking-num">${escapeText(r.booking.bookNum)}</span></td>
+        <td>${escapeText(r.booking.guest)}</td>
+        <td><div class="name-match"><span class="name-booking">${escapeText(r.vhf.nombre)}</span></div></td>
+        <td>${escapeText(r.booking.checkin)}</td>
+        <td>${escapeText(r.booking.checkout)}</td>
+        <td>${scoreBar(r.score)}</td>
+      </tr>`).join('');
+
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+function exportResults() {
+  if (!lastResults) return;
+  const { actionRows, unknownRows, okRows } = lastResults;
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Requieren baja
+  const ws1Data = [
+    ['N° Booking', 'Huésped Booking', 'Nombre en VHF', 'Check-in', 'Check-out', 'Estado VHF', 'Similitud %'],
+    ...actionRows.map(r => [
+      r.booking.bookNum, r.booking.guest, r.vhf.nombre,
+      r.booking.checkin, r.booking.checkout, r.vhf.status,
+      Math.round(r.score * 100) + '%'
+    ])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws1Data), 'Dar de baja');
+
+  // Sheet 2: No encontradas
+  const ws2Data = [
+    ['N° Booking', 'Huésped Booking', 'Check-in', 'Check-out', 'Mejor coincidencia VHF', 'Estado VHF', 'Llegada VHF', 'Partida VHF', 'Motivo', 'Revisión', 'Similitud %'],
+    ...unknownRows.map(r => [
+      r.booking.bookNum, r.booking.guest,
+      r.booking.checkin, r.booking.checkout,
+      r.vhf?.nombre, r.vhf?.status, r.vhf?.llegada, r.vhf?.partida, r.reason, isReviewed(r) ? 'Revisada' : 'Pendiente',
+      r.vhf ? Math.round(r.score * 100) + '%' : '—'
+    ])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws2Data), 'Revisión manual');
+
+  // Sheet 3: OK
+  const ws3Data = [
+    ['N° Booking', 'Huésped Booking', 'Nombre en VHF', 'Check-in', 'Check-out', 'Similitud %'],
+    ...okRows.map(r => [
+      r.booking.bookNum, r.booking.guest, r.vhf.nombre,
+      r.booking.checkin, r.booking.checkout,
+      Math.round(r.score * 100) + '%'
+    ])
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws3Data), 'Check-out OK');
+
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `conciliacion_booking_${today}.xlsx`);
+}
+</script>
+</body>
+</html>
